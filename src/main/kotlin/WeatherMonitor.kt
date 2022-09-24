@@ -4,6 +4,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -12,12 +13,11 @@ import kotlin.math.roundToInt
 
 class WeatherMonitor(override val refreshScreenTime: Long = 5000L,
                      override val refreshDataTime: Long = 60000L,
-                     private val flipped: Boolean = false,
-                     override var runMonitor: Boolean = false,
                      override val scope: CoroutineScope
 ) : Monitor {
 
     override var screen: String = " ".repeat(84)
+    override var jobs: List<Job> = listOf()
     private var initialized: Boolean = false
 
     private val client = HttpClient()
@@ -40,22 +40,21 @@ class WeatherMonitor(override val refreshScreenTime: Long = 5000L,
     private var lastScreenIndex: Int = 0
 
     override suspend fun updateData() {
-        scope.launch {
-            val response: HttpResponse = (
-                client.request("https://www.yahoo.com/news/weather/germany/augsburg/augsburg-20067030")
-                )
-            val stringBody: String = response.body()
-            temperature = Gson().fromJson(
-                temperatureRegex.find(stringBody)?.value, temperature.javaClass
-                )
-            condition = (
-                conditionRegex.find(stringBody)?.value!!
-                )
-            rain = (
-                rainRegex.find(stringBody)?.value!!
-                )
-            delay(refreshDataTime)
-        }
+        val response: HttpResponse = (
+            client.request("https://www.yahoo.com/news/weather/germany/augsburg/augsburg-20067030")
+            )
+        val stringBody: String = response.body()
+        temperature = Gson().fromJson(
+            temperatureRegex.find(stringBody)?.value, temperature.javaClass
+            )
+        condition = (
+            conditionRegex.find(stringBody)?.value!!
+            )
+        rain = (
+            rainRegex.find(stringBody)?.value!!
+            )
+        initialized = true
+        updateScreen()
     }
 
     override suspend fun updateScreen() {

@@ -1,32 +1,34 @@
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 interface Monitor {
     val refreshScreenTime: Long
     val refreshDataTime: Long
     val scope: CoroutineScope
     var screen: String
-    var runMonitor: Boolean
-    suspend fun updateScreen()
-    suspend fun launchMonitor(monitor: Monitor = this) {//= coroutineScope{
-        monitor.runMonitor = true
-        scope.launch {
-            while (monitor.runMonitor) {
-                updateScreen()
-                delay(monitor.refreshScreenTime)
+    var jobs: List<Job>
+    suspend fun launchMonitor() {//= coroutineScope{
+        val monitor: Monitor = this
+        monitor.jobs = listOf(
+            scope.launch {
+                while (true) {
+                    updateScreen()
+                    delay(monitor.refreshScreenTime)
+                }
+            },
+            scope.launch {
+                while(refreshDataTime > 0)
+                    updateData()
+                    delay(monitor.refreshDataTime)
             }
-        }
-        scope.launch {
-            updateData()
-        }
+        )
     }
-    suspend fun updateData() {
 
-    }
+    suspend fun updateScreen()
+
+    suspend fun updateData()
+
     fun terminateMonitor() {
-        runMonitor = false
+        jobs.forEach { it.cancel("terminated monitor") }
     }
     fun title(i: Int, titleIndex: Int): String {
         // Return the character that indicates the title part from the font data

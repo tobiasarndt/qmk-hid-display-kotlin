@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import org.hid4java.*
 import org.json.JSONObject
 import java.util.*
+import kotlin.math.min
 
 //fun main_() = runBlocking {
 //    doWorld()
@@ -57,36 +58,62 @@ import java.util.*
 //}
 
 
-fun main(args : Array<String>): Unit = runBlocking {
+suspend fun main(args : Array<String>): Unit {
     var product = "Jorne"; //"Lily58"; //
-    //connectKeyboard(product)
-    println("test")
-    val timeMonitor: Monitor = WeatherMonitor(scope = this)
-
-    println("test2")
-    //val keyboard: HidDevice = connectKeyboard("Jorne")
-    println("reading")
-    var blob: ByteArray = ByteArray(168)
-    var run: Boolean = true
     //sendToKeyboard(keyboard, timeMonitor.getScreen())
-    coroutineScope {
-        println("starting")
-        timeMonitor.launchMonitor()
 
+    var screenIndex: Int = 0
+
+    var keyboard: HidDevice? = null
+    var connected = false
+
+
+    coroutineScope {
         launch {
-            delay(30000L)
-            timeMonitor.terminateMonitor()
-            print("finished")
+            var keyboardReading: ByteArray = ByteArray(168)
+            var keyboardReadingStatus: Int
+            val monitorList: List<Monitor> = listOf(
+                TimeMonitor(scope = this),
+                WeatherMonitor(scope = this)
+            )
+            for (monitor in monitorList) {
+                monitor.updateData()
+            }
+            var currentMonitor: Monitor = monitorList[screenIndex]
+            currentMonitor.launchMonitor()
+            while (true) {
+                if (connected) {
+                    println("waiting for keyboard to send new index")
+                    keyboardReadingStatus = keyboard!!.read(keyboardReading)
+                    println("new index received")
+                    if (keyboardReadingStatus == -1) {
+                        currentMonitor.terminateMonitor()
+                        connected = false
+                    } else {
+                        println("changing screen")
+                        currentMonitor.terminateMonitor()
+                        screenIndex = byteArrayToInt(keyboardReading) % 2
+                        currentMonitor = monitorList[screenIndex]
+                        currentMonitor.launchMonitor()
+                        sendToKeyboard(keyboard!!, currentMonitor.screen)
+                    }
+                    delay(1000L)
+                } else {
+                    keyboard = connectKeyboard(product)
+                    connected = true
+                    launch {
+                        while (connected) {
+                            println(currentMonitor.jobs)
+                            println(currentMonitor.screen)
+                            sendToKeyboard(keyboard!!, currentMonitor.screen)
+                            delay(min(currentMonitor.refreshScreenTime, 30000L))
+                        }
+                    }
+                }
+            }
         }
-//        launch {
-//            while (true) {
-//                println("reading")
-//                println(keyboard.read(blob))
-//                println(byteArrayToInt(blob))
-//                println("read")
-//                delay(1000L)
-//            }
-//        }
+
+
     }
 }
 
@@ -95,6 +122,7 @@ fun byteArrayToInt(bytes: ByteArray): Int {
     for (i in bytes.indices) {
         result = result or (bytes[i].toInt() shl 8 * i)
     }
+    println(result)
     return result
 }
 

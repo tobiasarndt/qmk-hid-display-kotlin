@@ -16,9 +16,10 @@ interface Monitor {
                 }
             },
             scope.launch {
-                while(refreshDataTime > 0)
+                while(refreshDataTime > 0) {
                     updateData()
                     delay(monitor.refreshDataTime)
+                }
             }
         )
     }
@@ -32,7 +33,7 @@ interface Monitor {
     }
     fun title(i: Int, titleIndex: Int): String {
         // Return the character that indicates the title part from the font data
-        if (i === 3) {
+        if (i == 3) {
             return "\u00DE";
         }
         return (0x9a - titleIndex + i * 32).toChar().toString();

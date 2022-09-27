@@ -5,13 +5,15 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.max
-import kotlin.math.min
+import java.lang.Math.max
+import java.lang.Math.min
 import kotlin.math.roundToInt
 
-class WeatherMonitor(override val refreshScreenTime: Long = 5000L,
+//import kotlin.math.max
+//import kotlin.math.min
+//import kotlin.math.roundToInt
+
+class WeatherMonitor(override val refreshScreenTime: Long = 1000L,
                      override val refreshDataTime: Long = 60000L,
                      override val scope: CoroutineScope
 ) : Monitor {
@@ -37,55 +39,59 @@ class WeatherMonitor(override val refreshScreenTime: Long = 5000L,
     private var lastWeather: MutableMap<String, String> = mutableMapOf(
         "condition" to condition
     )
-    private var lastScreenIndex: Int = 0
+    private var lastScrollingIndex: Int = 0
 
     override suspend fun updateData() {
-        val response: HttpResponse = (
-            client.request("https://www.yahoo.com/news/weather/germany/augsburg/augsburg-20067030")
+        try {
+            val response: HttpResponse = (
+                client.request("https://de.nachrichten.yahoo.com/wetter/")
+                )
+            val stringBody: String = response.body()
+            temperature = Gson().fromJson(
+                temperatureRegex.find(stringBody)?.value, temperature.javaClass
             )
-        val stringBody: String = response.body()
-        temperature = Gson().fromJson(
-            temperatureRegex.find(stringBody)?.value, temperature.javaClass
-            )
-        condition = (
-            conditionRegex.find(stringBody)?.value!!
-            )
-        rain = (
-            rainRegex.find(stringBody)?.value!!
-            )
-        initialized = true
-        updateScreen()
+            condition = (
+                conditionRegex.find(stringBody)?.value!!
+                )
+            rain = (
+                rainRegex.find(stringBody)?.value!!
+                )
+            initialized = true
+            println("----------------------test-----------------")
+            updateScreen()
+        } catch (e: Exception) {
+            println("updateWeather failed: $e")
+        }
     }
 
     override suspend fun updateScreen() {
         if(!initialized) {
-            updateData()
             initialized = true
         } else {
-            var conditionSliced: String = condition
-            val tempNowString: Int = ((temperature["now"]!! - 32)*5/9).roundToInt()
-            val tempHighString: Int = ((temperature["high"]!! - 32)*5/9).roundToInt()
-            val tempLowString: Int = ((temperature["low"]!! - 32)*5/9).roundToInt()
+            var conditionSliced: String
+            val tempNowString: Int = ((temperature["now"]!!)).roundToInt()
+            val tempHighString: Int = ((temperature["high"]!!)).roundToInt()
+            val tempLowString: Int = ((temperature["low"]!!)).roundToInt()
             val tempHLString = "${30.toChar()}$tempHighString ${31.toChar()}$tempLowString"
             if(lastWeather["condition"] == condition &&
-                condition.length > 9) {
-                lastScreenIndex = (lastScreenIndex + 1) % condition.length
+                condition.length > 11) {
                 conditionSliced = condition.slice(
-                    lastScreenIndex..min(lastScreenIndex + 9, condition.length)
+                    lastScrollingIndex..min(lastScrollingIndex + 11, condition.length - 1)
                 )
+                lastScrollingIndex = (lastScrollingIndex + 1) % condition.length
             } else {
-                conditionSliced = condition.slice(0..min(condition.length-1, 9))
+                conditionSliced = condition.slice(0..min(condition.length-1, 11))
             }
             lastWeather["condition"] = condition
 
             screen =
-                "desc: $conditionSliced${" ".repeat(max(0, 9 - (" $conditionSliced").length))}" +
-                " |  ${title(0,2)}" +
-                "temp: ${tempNowString}${" ".repeat(max(0, 9 - (" $tempNowString").length))}" +
-                " |  ${title(1,2)}" +
-                "temp:${tempHLString}${" ".repeat(max(0, 10 - (" $tempHLString").length))}" +
-                "|  ${title(1,2)}" +
-                "rain: ${rain}%${" ".repeat(max(0, 8 - ("" + rain).length))} |  ${title(3, 2)}"
+                "desc: $conditionSliced${" ".repeat(max(0, 13 - (" $conditionSliced").length))}" +
+                " ${6.toChar()}${title(0,2)}" +
+                "temp: ${tempNowString}${" ".repeat(max(0, 13 - (" $tempNowString").length))}" +
+                " ${6.toChar()}${title(1,2)}" +
+                "temp: ${tempHLString}${" ".repeat(max(0, 13 - (" $tempHLString").length))}" +
+                " ${6.toChar()}${title(1,2)}" +
+                "rain: ${rain}%${" ".repeat(max(0, 11 - ("" + rain).length))} ${6.toChar()}${title(3, 2)}"
         }
     }
 }

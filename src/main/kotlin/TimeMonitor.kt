@@ -1,23 +1,21 @@
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import java.io.File
 import java.time.LocalDateTime
-import kotlin.io.path.Path
 
 class TimeMonitor (override val refreshScreenTime: Long = 10000L,
                             private val flipped: Boolean = false,
                             override val scope: CoroutineScope
 ) : Monitor {
 
-    private val mapper = jacksonObjectMapper()
-    private val config: Map<String,List<List<String>>> =
-        mapper.readValue(File(Path("src/main/resources/digits.json").toString()))
+    private val fileContent = this::class.java.classLoader.getResource("digits.json").readText()
+    private val digitsStore: DigitsStore = Gson().fromJson(fileContent,DigitsStore::class.java)
+    private val digits: List<Digit> = if (flipped) digitsStore.digitsFlipped else digitsStore.digits
     override val refreshDataTime: Long = 0
     override var screen: String = " ".repeat(84)
     override var jobs: List<Job> = listOf()
-    private val digits: List<List<String>> = if (flipped) config["digits"]!! else config["digits_flipped"]!!
     private val bar: Char = 6.toChar()
 
     override suspend fun updateScreen() {
@@ -28,10 +26,10 @@ class TimeMonitor (override val refreshScreenTime: Long = 10000L,
         val d4: Int = now.minute % 10
 
         this.screen = (
-            digits[d1][0] + digits[d2][0] + bar + digits[d3][0] + digits[d4][0] +
-            digits[d1][1] + digits[d2][1] + bar + digits[d3][1] + digits[d4][1] +
-            digits[d1][2] + digits[d2][2] + bar + digits[d3][2] + digits[d4][2] +
-            digits[d1][3] + digits[d2][3] + bar + digits[d3][3] + digits[d4][3]
+            digits[d1]._0 + digits[d2]._0 + bar + digits[d3]._0 + digits[d4]._0 +
+            digits[d1]._1 + digits[d2]._1 + bar + digits[d3]._1 + digits[d4]._1 +
+            digits[d1]._2 + digits[d2]._2 + bar + digits[d3]._2 + digits[d4]._2 +
+            digits[d1]._3 + digits[d2]._3 + bar + digits[d3]._3 + digits[d4]._3
             )
     }
 
